@@ -1,0 +1,333 @@
+常用操作
+OVS
+ovs-vsctl list interface dpdk8
+ovs-appctl dpctl/show -s
+
+ovs-appctl dpif/dump-flows br0
+
+ovs-appctl dpif-netdev/pmd-stats-show
+ovs-appctl dpif-netdev/pmd-rxq-show
+
+
+ovs-appctl ofproto/trace br-int in_port=33,udp,dl_src:fa:16:3e:69:ab:a2,dl_dst:fa:16:3e:90:0e:55,nw_src:x.x.x.x,nw_dst:x.x.x.x,nw_ttl=64,udp_src=0,udp_dst=0
+博通 
+bnxtnvm -dev=enP8p1s0f4np0 setoption=mac_address:8#fa:16:3e:7e:2e:42
+bnxtnvm -dev=enP8p1s0f4np0 getoption=mac_address:192
+
+./ovs-appctl offload/flow-debug
+    - config
+    - neutron
+5、执行部署
+ansible-playbook -i inventory/lq-ppe.yml playbooks/deploy_baremental.yml
+
+免密登陆配置
+ssh-keygen -t rsa生成pub文件
+ssh-copy-id -i ~/.ssh/id_rsa.pub 用户名@ip
+ssh-keygen -R x.x.x.x
+
+stringary升级
+
+ipmitool -I lanplus -H x.x.x.x -U root -P xxxx power on
+ipmitool -I lanplus -H x.x.x.x -U root -P xxxx sol activate
+
+ipmitool -I lanplus -H x.x.x.x -U toutiao -P x.x.x.x sol activate
+
+配置ipmi串口
+serial命令用于设置串口的参数:
+--unit:串口设备,0就表示ttyS0,如果是ttyS1就要设为1;
+--speed:波特率;
+--work:数据位;
+--parity:奇偶校验位;
+--stop:停止位。
+直接修改/boog/grub
+serial --speed=9600 --unit=0 --word=8 --parity=no --stop=1
+terminal_input serial
+terminal_output serial
+修改/etc/default/grub
+系统基本环境:
+root@brinkman:~# lsb_release -a
+No LSB modules are available.
+Distributor ID:    Debian
+Description:    Debian GNU/Linux testing (wheezy)
+Release:    testing
+Codename:    wheezy
+root@brinkman:~# uname -a
+Linux brinkman 2.6.38-2-686 #1 SMP Sun May 8 14:49:45 UTC 2011 i686 GNU/Linux
+root@brinkman:~# grub-setup -V
+grub-setup (GRUB) 1.99~rc1-13
+配置基本方法:
+1.Checking The Serial devices
+$ dmesg 
+grep tty
+serial8250: ttyS0 at I/O 0x3f8 (irq = 4) is a 16550A
+serial8250: ttyS1 at I/O 0x2f8 (irq = 3) is a 16550A
+00:09: ttyS0 at I/O 0x3f8 (irq = 4) is a 16550A
+00:0a: ttyS1 at I/O 0x2f8 (irq = 3) is a 16550A
+2.With GRUB2,edit /etc/default/grub;
+GRUB_CMDLINE_LINUX="console=tty0 console=ttyS0,9600n8"
+GRUB_TERMINAL=serial
+GRUB_SERIAL_COMMAND="serial --unit=0 --speed=9600 --word=8 --parity=no --stop=1"
+3.root@brinkman:~# update-grub
+4.edit /etc/inittab;
+root@brinkman:~# vim /etc/inittab
+T0:23:respawn:/sbin/getty -L ttyS0 9600 vt100
+T1:23:respawn:/sbin/getty -L ttyS1 9600 vt100
+5.在/etc/securetty文件中有ttyS0,确保在串口下能直接用ROOT登录
+root@brinkman:~# grep "ttyS0" /etc/securetty
+ttyS0
+linux下的超级终端工具minicom
+cscope
+cscope -Rbkq
+性能测试
+- Pps
+iperf -s x.x.x.x -D  -u
+iperf -c x.x.x.x -l 1 -u -i 2  -t 200 -b 1000000m
+- Bps
+        netperf -H x.x.x.x -t omni -- -d rr -O "THROUGHPUT, THROUGHPUT_UNITS, MIN_LATENCY, MAX_LATENCY, MEAN_LATENCY"
+k8s集群安装部署
+apt-get install -y apt-transport-https curl
+
+curl https://mirrors.aliyun.com/kubernetes/apt/doc/apt-key.gpg |apt-key add -  && echo "deb https://mirrors.aliyun.com/kubernetes/apt/ kubernetes-xenial main"  >>/etc/apt/sources.list.d/kubernetes.list  && apt update
+apt-cache madison kubeadm
+apt install -y kubelet kubeadm kubectl kubernetes-cni
+
+Master:
+root@k8s-master:~# cat /etc/crictl.yaml
+runtime-endpoint: unix:///var/run/containerd/containerd.sock
+image-endpoint: unix:///var/run/containerd/containerd.sock
+timeout: 10
+debug: false
+
+
+containerd config default > /etc/containerd/config.toml
+
+
+wget https://docs.projectcalico.org/archive/v3.22/manifests/calico.yaml
+kubectl apply -f calico.yaml
+
+
+kubeadm config images pull --config=init.yaml
+kubeadm init --config=init.yaml
+
+
+
+sudo cp /etc/kubernetes/admin.conf $HOME/
+sudo chown $(id -u):$(id -g) $HOME/admin.conf
+export KUBECONFIG=$HOME/admin.conf
+暂时无法在文档外展示此内容
+Node:
+kubeadm join --config=join.yaml
+暂时无法在文档外展示此内容
+创建deployment
+kubectl create deployment nginx --image=nginx
+kubectl expose deployment nginx --port=80 --type=NodePort
+部署cni插件
+kubectl apply -f "https://cloud.weave.works/k8s/net?k8s-version=$(kubectl version | base64 | tr -d '\n')"
+
+curl  https://docs.projectcalico.org/manifests/calico.yaml -O
+
+
+
+诊断
+kubectl debug -it my-nginx-547d878d89-bk256 --image=praqma/network-multitool  -- s
+
+移除node
+kubectl drain swarm1 --delete-local-data --force --ignore-daemonsets
+kubectl delete node swarm1
+
+
+
+BPF
+tc qdisc replace dev lxc7d3f1525e9d4 ingress
+tc filter replace dev lxc7d3f1525e9d4 ingress prio 10 handle 1 bpf da obj from_lxc.o sec from_lxc
+
+tc qdisc del dev lxc7d3f1525e9d4 ingress
+
+
+
+mpstat -P ALL 1 | awk '$NF < 80'
+
+glog输出
+-alsologtostderr
+
+
+安装ovs-tcpdump
+apt install python3-openvswitch
+
+TOS操作
+
+
+bond0配置
+
+ip l add bond0 type bond mode 4
+ip l set ens1f0 master bond0
+ip l set ens1f1 master bond0
+ip l set bond0 up
+ip l set bond0 mtu 1550
+
+auto bond0
+iface bond0 inet static
+address x.x.x.x
+netmask x.x.x.x
+network x.x.x.x
+up ip route add default via x.x.x.x dev bond0
+bond-slaves ens1f0 ens1f1
+bond-mode 802.3ad
+bond-miimon 100
+bond-use-carrier 1
+bond-lacp-rate 1
+bond-min-links 1
+bond-xmit-hash-policy encap3+4
+
+vxlan配置
+ ip link add vxlan0 type vxlan \
+    id 1 \
+    remote x.x.x.x \
+    local x.x.x.x \
+    dstport 4789 \
+    dev eth0
+ 
+ip addr add x.x.x.x/24 dev vxlan0
+ip link set vxlan0 up
+
+
+tcp的统计错误返回
+sar -n ETCP 1
+
+CPU负载
+mpstat -P ALL 1 | awk '$NF < 80'
+
+sed操作
+sed -i "s/原字符串/新字符串/g" `grep 原字符串 -rl 所在目录`
+
+
+性能测试
+iperf3 -c 192.168.1.219 -i 1 -t 10000 -P16
+
+pktgen -l 2,3,4,5,6,7,8,9,10 -w 26:00.0,speed=100000 --log-level 8 --socket-mem 2048 --file-prefix=pmd-gemini -- -m "[3-6:7-10].0"
+pktgen -l 2,3,4,5,6,7,8,9,10,11,12 -w 26:00.0,speed=100000 --log-level 8 --socket-mem 2048 --file-prefix=pmd-gemini -- -m "[3-7:8-12].0"
+pktgen -l 2,3,4,5,6,7,8,9,10,11,12,13,14 -w 26:00.0,speed=100000 --log-level 8 --socket-mem 2048 --file-prefix=pmd-gemini -- -m "[3-8:9-14].0"
+
+pktgen -l 2,3,4,5,6,7,8,9,64,65,66,67,68,69,70 -w 26:00.0,speed=100000 --log-level 8 --socket-mem 4096 --file-prefix=pmd-gemini -- -m "[3-9:64-70].0"
+pktgen -l 2,3,4,5,6,7,8,9,10,64,65,66,67,68,69,70,71 -w 26:00.0,speed=100000 --log-level 8 --socket-mem 4096 --file-prefix=pmd-gemini -- -m "[3-10:64-71].0"
+
+pktgen -l 2,3,4,5,6,7,8,9,10,11,64,65,66,67,68,69,70,71,72 -w 26:00.0,speed=100000 --log-level 8 --socket-mem 4096 --file-prefix=pmd-gemini -- -m "[3-11:64-72].0"
+pktgen -l 2,3,4,5,6,7,8,9,10,11,12,64,65,66,67,68,69,70,71,72,73 -w 26:00.0,speed=100000 --log-level 8 --socket-mem 4096 --file-prefix=pmd-gemini -- -m "[3-12:64-73].0"
+pktgen -l 2,3,4,5,6,7,8,9,10,11,12,13,64,65,66,67,68,69,70,71,72,73,74 -w 26:00.0,speed=100000 --log-level 8 --socket-mem 4096 --file-prefix=pmd-gemini -- -m "[3-13:64-74].0"
+pktgen -l 2,3,4,5,6,7,8,9,10,11,12,13,14,64,65,66,67,68,69,70,71,72,73,74,75 -w 26:00.0,speed=100000 --log-level 8 --socket-mem 4096 --file-prefix=pmd-gemini -- -m "[3-14:64-75].0"
+
+
+
+set 0 proto udp
+range 0 src mac start 00:16:3e:2e:86:00
+range 0 src mac min 00:16:3e:2e:86:00
+range 0 src mac inc 00:00:00:00:00:00
+range 0 dst mac start 00:16:3e:68:68:6b
+range 0 dst mac min 00:16:3e:68:68:6b
+range 0 dst mac inc 00:00:00:00:00:00
+range 0 src port start 10000
+range 0 src port min 10000
+range 0 src port max 10000
+range 0 src port inc 0
+range 0 dst port start 2000
+range 0 dst port min 2000
+range 0 dst port max 2
+range 0 dst port inc 0
+range 0 proto udp
+range 0 src ip start x.x.x.x
+range 0 src ip min x.x.x.x
+range 0 src ip inc 0.0.0.0
+range 0 size start 64
+range 0 size min 64
+range 0 size max 64
+range 0 size inc 0
+range 0 dst ip start x.x.x.x
+range 0 dst ip min x.x.x.x
+range 0 dst ip inc 0.0.0.0
+enable all range
+start 0
+
+
+https://github.com/ideawu/c1000k
+
+
+内核编译
+http://ftp.iij.ad.jp/pub/linux/centos-vault/centos/8.3.2011/BaseOS/Source/SPackages/kernel-4.18.0-240.el8.src.rpm
+rpm -ivh kernel-4.18.0-240.el8.src.rpm
+cd rpmbuild/SPECS
+yum install rpm-build
+rpmbuild -bp kernel.spec --nodeps
+
+git init
+git add .
+git commit -a -m "init"
+
+cd kernel-4.18.0-240.el8/linux-4.18.0-240.el8.x86_64/
+cp /boot/config-4.18.0-240.el8.x86_64 .config
+vimdiff .config configs/kernel-4.18.0-x86_64.config
+make drivers/net/virtio_net.ko
+
+make bzImage
+make modules
+make modules_install
+make install
+
+git打patch
+git format-patch -1 xxxxx
+
+先检查patch文件:git apply --stat newpatch.patch
+检查能否应用成功:git apply --check newpatch.patch
+打补丁:git am --signoff < newpatch.patch
+
+
+mpstat -P ALL 1 | awk '$NF < 80'
+
+yum源
+sed -i 's/\$releasever/8.3.2011/g' /etc/yum.repos.d/CentOS-Base.repo
+
+
+火焰图
+https://zhuanlan.zhihu.com/p/486792358
+
+
+Dos命令
+改主机名
+wmic computersystem where "name='abc'" call rename 123
+pnputil -i -a ./viostor.inf
+
+netsh firewall set icmpsetting 8
+
+
+密码:
+HLKAdminUser
+Testpassword,1,
+net use \\x.x.x.x\HLKInstall
+# 输入账号和密码
+# 安装 HLK Client
+start \\x.x.x.x\HLKInstall\Client\Setup.cmd /qn ICFAGREE=Yes
+
+
+slmgr.vbs /rearm
+
+
+扩盘
+qemu-img resize test5.qcow2 +2G
+qemu-img convert -f qcow2 -O raw debian-buster-5.4.56.bsk.10-arm64-uefi.qcow2 debian-buster-5.4.56.bsk.10-arm64-uefi.raw
+
+growpart /dev/vda 2
+sudo resize2fs /dev/vda2
+
+
+
+CPU锁频
+https://stackoverflow.com/questions/23526671/how-to-solve-the-cpufreqset-errors
+
+kinit保存配置
+kinit --keychain zhangjun.thor@BYTEDANCE.COM
+
+
+转发bmc
+iptables -F
+iptables -t nat -I PREROUTING -i bond0 -p tcp --dport 8443 -j DNAT --to x.x.x.x:443
+iptables -t nat -A POSTROUTING -j MASQUERADE
+
