@@ -1,0 +1,8 @@
+1. 下载镜像
+2. 安装qemu
+   a. apt install qemu-kvm 
+   b. apt install install libvirt 
+3. qemu配置修改group和user /etc/libvirt/qemu.conf 
+4. 开启大页配置
+   hugepagesz=2M hugepages=512
+
