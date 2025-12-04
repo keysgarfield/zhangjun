@@ -25,8 +25,10 @@ switch_gateway() {
     
     echo "正在切换网关到: $gateway (接口: $interface)"
     
-    # 删除现有默认路由
-    ip route del default 2>/dev/null
+    # 删除所有现有的默认路由（可能有多个）
+    while ip route del default 2>/dev/null; do
+        :
+    done
     
     # 添加新的默认路由
     if ip route add default via $gateway dev $interface; then
