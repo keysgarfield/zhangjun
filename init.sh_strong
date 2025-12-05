@@ -1,0 +1,34 @@
+#!/bin/bash
+
+brctl addbr virbr0
+
+ip addr add dev virbr0 10.10.10.1/24
+ifconfig virbr0 up
+brctl stp virbr0 off
+
+iptables -t nat -A POSTROUTING -s 10.10.10.0/24 ! -d 10.10.10.0/24 -j MASQUERADE
+#iptables -t nat -A POSTROUTING -s 172.17.0.0/24 ! -d 192.168.0.0/24 -j MASQUERADE
+sysctl -w net.ipv4.ip_forward=1
+iptables -t filter -I FORWARD -j ACCEPT
+iptables -t mangle -I FORWARD -j ACCEPT
+
+sysctl -w net.ipv4.ip_forward=1
+
+# 2. 清理 mangle/FORWARD 中不必要的 ACCEPT（避免规则被提前匹配）
+iptables -t mangle -F FORWARD   # 清空 mangle/FORWARD 链（可选，确保干净）
+# 或者至少删除你之前加的：
+# iptables -t mangle -D FORWARD -j ACCEPT
+
+# 3. 【关键】添加 MSS clamp 规则（放在 FORWARD 链最前面！）
+iptables -t mangle -I FORWARD -s 10.10.10.0/24 ! -d 10.10.10.0/24 -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss 1360
+
+# 4. NAT 规则（你已有，保留）
+iptables -t nat -A POSTROUTING -s 10.10.10.0/24 ! -d 10.10.10.0/24 -j MASQUERADE
+
+# 5. 【安全加固】细化 FORWARD filter 规则（不要全开 ACCEPT！）
+# 允许已建立的连接
+iptables -t filter -A FORWARD -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+# 允许 VM 主动发起的新连接
+iptables -t filter -A FORWARD -s 10.10.10.0/24 -d 0.0.0.0/0 -m conntrack --ctstate NEW -j ACCEPT
+# 拒绝其他（默认 DROP 更安全，但这里先显式拒绝）
+iptables -t filter -A FORWARD -j DROP
